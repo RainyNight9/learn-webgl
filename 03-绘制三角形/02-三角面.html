@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>js改变顶点颜色</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="canvas"></canvas>
+
+  <script id="vertexShader" type="x-shader/x-vertex">
+    attribute vec4 a_Position;
+    void main(){
+        gl_Position = a_Position;
+        //gl_PointSize = 20.0;
+    }
+  </script>
+  <script id="fragmentShader" type="x-shader/x-fragment">
+    void main(){
+        gl_FragColor=vec4(1.0,1.0,0.0,1.0);
+    }
+  </script>
+
+  <script type="module">
+    import { initShaders } from '../public/js/Utils.js';
+
+    const canvas = document.getElementById('canvas');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const gl = canvas.getContext('webgl');
+
+    const vsSource = document.getElementById('vertexShader').innerText;
+    const fsSource = document.getElementById('fragmentShader').innerText;
+
+    initShaders(gl, vsSource, fsSource);
+
+    // 立顶点数据，两个浮点数构成一个顶点，分别代表x、y 值。
+    const vertices = new Float32Array([
+      0.0, 0.1,
+      -0.1, -0.1,
+      0.1, -0.1
+    ])
+
+    // 建立缓冲对象
+    const vertexBuffer = gl.createBuffer();
+
+    // 绑定缓冲对象
+    // gl.bindBuffer(target,buffer) 绑定缓冲区
+    // target 要把缓冲区放在 webgl 系统中的什么位置
+    // buffer 缓冲区
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+
+    // 往缓冲区对象中写入数据
+    // bufferData(target, data, usage) 将数据写入缓冲区
+    // target 要把缓冲区放在webgl 系统中的什么位置
+    // data 数据
+    // usage 向缓冲区写入数据的方式，咱们在这里先知道 gl.STATIC_DRAW 方式即可，它是向缓冲区中一次性写入数据，着色器会绘制多次。
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+    // 将缓冲区对象分配给attribute 变量
+    const a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+
+    // gl.vertexAttribPointer(local,size,type,normalized,stride,offset) 将缓冲区对象分配给attribute 变量
+    // local attribute变量
+    // size 顶点分量的个数，比如我们的vertices 数组中，两个数据表示一个顶点，那咱们就写2
+    // type 数据类型，比如 gl.FLOAT 浮点型
+    // normalized 是否将顶点数据归一
+    // stride 相邻两个顶点间的字节数，我的例子里写的是0，那就是顶点之间是紧挨着的
+    // offset 从缓冲区的什么位置开始存储变量，我的例子里写的是0，那就是从头开始存储变量
+    gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
+
+    // 开启顶点数据的批处理功能。
+    gl.enableVertexAttribArray(a_Position);
+
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    // drawArrays(mode,first,count)
+    // mode 绘图模式，比如 gl.POINTS 画点
+    // first 从哪个顶点开始绘制
+    // count 要画多少个顶点
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  </script>
+</body>
+
+</html>
