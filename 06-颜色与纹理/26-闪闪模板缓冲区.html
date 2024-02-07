@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>颜色合成</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="canvas"></canvas>
+  <!-- 顶点着色器 -->
+  <script id="vertexShader" type="x-shader/x-vertex">
+    attribute vec4 a_Position;
+            void main(){
+                 //点位
+                 gl_Position=vec4(a_Position.x,a_Position.y,0,1);
+                 //尺寸
+                 gl_PointSize=a_Position.z;
+            }
+        </script>
+  <!-- 片元着色器 -->
+  <script id="fragmentShader" type="x-shader/x-fragment">
+    precision mediump float;
+            void main(){
+                 float dist=distance(gl_PointCoord,vec2(0.5,0.5));
+                 if(dist<0.5){
+                   gl_FragColor=vec4(0,0.7,0.9,1);
+                 }else{
+                   discard;
+                 }
+            }
+        </script>
+  <script>
+    const canvas = document.querySelector('#canvas')
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight
+
+    //三维画笔
+    const gl = canvas.getContext('webgl', {
+      stencil: true
+    })
+    gl.enable(gl.STENCIL_TEST)
+
+    // 获取着色器文本
+    const vsSource = document.querySelector('#vertexShader').innerText
+    const fsSource = document.querySelector('#fragmentShader').innerText
+
+    //初始化着色器
+    initShaders(gl, vsSource, fsSource)
+
+    // 定义背景色，默认为(0,0,0,0)
+    // gl.clearColor(1, 0.95, 0.9, 1.0)
+    // 定义模板缓冲区的背景值，默认为0，这不是颜色，就是一个模板参考值
+    gl.clearStencil(0)
+    // 用定义好的背景色理缓冲区
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT)
+
+    //获取attribute 变量
+    const a_Position = gl.getAttribLocation(gl.program, 'a_Position')
+    //缓冲对象
+    const vertexBuffer = gl.createBuffer()
+    //绑定缓冲对象
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
+    //修改attribute 变量
+    gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 0, 0)
+    //赋能-批处理
+    gl.enableVertexAttribArray(a_Position)
+    //清空缓冲区
+    gl.bindBuffer(gl.ARRAY_BUFFER, null)
+
+    const drawStencil = DrawStencil()
+
+    const pi2 = Math.PI * 2
+    const halfWidth = canvas.width / 2
+    const halfHeight = canvas.height / 2
+    const r = Math.sqrt(halfWidth * halfWidth + halfHeight * halfHeight)
+    const rn = 10
+    const rnd = 1 / rn
+    const an = 12
+    const and = pi2 / an
+    const basicSize = Math.min(canvas.width, canvas.height) * 0.35
+    const canvasRatio = canvas.width / canvas.height
+
+      !(function ani(time = 0) {
+        render(time)
+        requestAnimationFrame(ani)
+      })()
+
+    function DrawStencil() {
+      let first = true
+      return function (x, y, size) {
+        if (first) {
+          gl.stencilFunc(gl.ALWAYS, 1, 0xff)
+          gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE)
+        } else {
+          gl.stencilFunc(gl.EQUAL, 1, 0xff)
+          gl.stencilOp(gl.REPLACE, gl.KEEP, gl.INVERT)
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
+        gl.bufferData(
+          gl.ARRAY_BUFFER,
+          new Float32Array([x, y, size]),
+          gl.STATIC_DRAW
+        )
+        gl.bindBuffer(gl.ARRAY_BUFFER, null)
+
+        gl.colorMask(false, false, false, false)
+        gl.drawArrays(gl.POINTS, 0, 1)
+        gl.colorMask(true, true, true, true)
+        first = false
+      }
+    }
+
+    function drawPoint(x, y, size) {
+      gl.stencilFunc(gl.EQUAL, 1, 0xff)
+      gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([x, y, size]),
+        gl.STATIC_DRAW
+      )
+      gl.bindBuffer(gl.ARRAY_BUFFER, null)
+      gl.drawArrays(gl.POINTS, 0, 1)
+    }
+
+    function render(time = 0) {
+      for (let j = 0; j < an; j++) {
+        const ang = j * and
+        const c = Math.cos(ang)
+        const s = Math.sin(ang) * canvasRatio
+        for (let i = 0; i < rn; i++) {
+          const x0 = Math.pow(rnd * i, 2)
+          const ratio = i / rn
+          const timeRatio = (Math.sin(time * 0.002 + ratio * pi2) + 1) / 2
+          const size = basicSize * ratio * timeRatio
+          drawStencil(x0 * c, x0 * s, size)
+        }
+      }
+
+      drawPoint(0, 0, 800)
+    }
+
+    // 初始化着色器
+    function initShaders(gl, vsSource, fsSource) {
+      //创建程序对象
+      const program = gl.createProgram()
+      //建立着色对象
+      const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource)
+      const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource)
+      //把顶点着色对象装进程序对象中
+      gl.attachShader(program, vertexShader)
+      //把片元着色对象装进程序对象中
+      gl.attachShader(program, fragmentShader)
+      //连接webgl上下文对象和程序对象
+      gl.linkProgram(program)
+      //启动程序对象
+      gl.useProgram(program)
+      //将程序对象挂到上下文对象上
+      gl.program = program
+      return true
+    }
+
+    function createProgram(gl, vsSource, fsSource) {
+      //创建程序对象
+      const program = gl.createProgram()
+      //建立着色对象
+      const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource)
+      const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource)
+      //把顶点着色对象装进程序对象中
+      gl.attachShader(program, vertexShader)
+      //把片元着色对象装进程序对象中
+      gl.attachShader(program, fragmentShader)
+      //连接webgl上下文对象和程序对象
+      gl.linkProgram(program)
+      return program
+    }
+
+    function loadShader(gl, type, source) {
+      //根据着色类型，建立着色器对象
+      const shader = gl.createShader(type)
+      //将着色器源文件传入着色器对象中
+      gl.shaderSource(shader, source)
+      //编译着色器对象
+      gl.compileShader(shader)
+      //返回着色器对象
+      return shader
+    }
+  </script>
+</body>
+
+</html>
